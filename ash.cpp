@@ -5,8 +5,17 @@
 #include <vector>
 #include <regex>
 #include <unistd.h>
+#include <filesystem>
+#include <cstdlib>
 
-void callCommand(const std::vector<std::string>& args) {
+void callCommand(char* args[]) {
+	int status;
+	pid_t pid = fork();
+	if (pid == 0) {
+		execvp(args[0], args);
+	} else {
+		wait(&status);
+	}
 }
 
 void executeCommand(const std::string& str) {
@@ -15,7 +24,7 @@ void executeCommand(const std::string& str) {
 	auto end = std::sregex_iterator();
 	int elems = std::distance(begin, end);
 	char* args[elems + 1];
-	args[elems] = "\0";
+	args[elems] = nullptr;
 	int index = 0;
 	for (std::sregex_iterator i = begin; i != end; ++i, ++index) {
 		std::smatch match = *i;
@@ -23,16 +32,24 @@ void executeCommand(const std::string& str) {
 		args[index] = new char[arg.length() + 1];
 		std::strcpy(args[index], arg.c_str());
 	}
-	if (args[0] == "exit") {
+	if (strcmp(args[0], "exit") == 0) {
 		exit(0);
-	}
-	
-	int status;
-	pid_t pid = fork();
-	if (pid == 0) {
-		execvp(args[0], args);
+	} else if (strcmp(args[0], "cd") == 0) {
+		if (elems == 1) {
+			std::filesystem::current_path(std::getenv("HOME"));
+		}
+		if (elems == 2) {
+			std::filesystem::path newpath = std::string(args[1]);
+			if (std::filesystem::is_directory(newpath)) {
+				std::filesystem::current_path(newpath);
+			} else {
+				std::cout << "Error: Invalid directory";
+			}
+		} else {
+			std::cout << "Error: Too many arguments.";
+		}
 	} else {
-		wait(&status);
+		callCommand(args);
 	}
 }
 
