@@ -1,6 +1,6 @@
-CC = g++
+CC = clang++
 CFLAGS = -Wall -g
 ash: ash.cpp
-	$(CC) $(CFLAGS) ash.c -o ash
+	$(CC) $(CFLAGS) ash.cpp -o ash
 clean: 
 	rm -f ash *~
