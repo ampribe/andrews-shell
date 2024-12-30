@@ -7,6 +7,7 @@
 #include <unistd.h>
 #include <filesystem>
 #include <cstdlib>
+#include <fstream>
 
 void callCommand(char* args[]) {
 	int status;
@@ -37,8 +38,7 @@ void executeCommand(const std::string& str) {
 	} else if (strcmp(args[0], "cd") == 0) {
 		if (elems == 1) {
 			std::filesystem::current_path(std::getenv("HOME"));
-		}
-		if (elems == 2) {
+		} else if (elems == 2) {
 			std::filesystem::path newpath = std::string(args[1]);
 			if (std::filesystem::is_directory(newpath)) {
 				std::filesystem::current_path(newpath);
@@ -73,8 +73,13 @@ void runInteractiveMode() {
 	}
 }
 
-void runBatchMode() {
-	std::cout << "Running batch mode...\n";
+void runBatchMode(char* filename) {
+	std::string line;
+	std::ifstream batch(filename);
+	while (std::getline(batch, line)) {
+		executeLine(line);
+	}
+	exit(0);
 }
 
 int main(int argc, char* argv[]) {
@@ -82,7 +87,7 @@ int main(int argc, char* argv[]) {
 		if (argc > 2) {
 			throw std::invalid_argument("Too many arguments");
 		} else if (argc == 2) {
-			runBatchMode();
+			runBatchMode(argv[1]);
 		} else {
 			runInteractiveMode();
 		}
