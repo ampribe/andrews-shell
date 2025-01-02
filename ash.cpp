@@ -4,10 +4,11 @@
 #include <cstring>
 #include <vector>
 #include <regex>
-#include <unistd.h>
 #include <filesystem>
 #include <cstdlib>
 #include <fstream>
+#include <fcntl.h>
+#include <unistd.h>
 
 void callCommand(char* args[]) {
 	int status;
@@ -19,35 +20,51 @@ void callCommand(char* args[]) {
 	}
 }
 
-void executeCommand(const std::string& str) {
+char** convertArgs(std::vector<std::string> vec, int* elems) {
+	*elems = vec.size();
+	char** args = new char*[vec.size() + 1];
+	for (size_t i = 0; i < vec.size(); i++) {
+		args[i] = new char[vec[i].length() + 1];
+		strcpy(args[i], vec[i].c_str());
+	}
+	return args;
+}
+
+std::vector<std::string> getArgs(const std::string& command) {
 	std:: regex re("[^\\s]+");
-	auto begin = std::sregex_iterator(str.begin(), str.end(), re);
+	auto begin = std::sregex_iterator(command.begin(), command.end(), re);
 	auto end = std::sregex_iterator();
-	int elems = std::distance(begin, end);
-	char* args[elems + 1];
-	args[elems] = nullptr;
-	int index = 0;
-	for (std::sregex_iterator i = begin; i != end; ++i, ++index) {
+	std::vector<std::string> args;
+	for (std::sregex_iterator i = begin; i != end; ++i) {
 		std::smatch match = *i;
 		std::string arg = match.str();
-		args[index] = new char[arg.length() + 1];
-		std::strcpy(args[index], arg.c_str());
+		args.push_back(arg);
 	}
+	return args;
+}
+
+void executecd(char** args, int elems) {
+	if (elems == 1) {
+		std::filesystem::current_path(std::getenv("HOME"));
+	} else if (elems == 2) {
+		std::filesystem::path newpath = std::string(args[1]);
+		if (std::filesystem::is_directory(newpath)) {
+			std::filesystem::current_path(newpath);
+		} else {
+			std::cout << "Error: Invalid directory";
+		}
+	} else {
+		std::cout << "Error: Too many arguments.";
+	}
+}
+
+void executeCommand(const std::string& str) {
+	int elems;
+	char** args = convertArgs(getArgs(str), &elems);
 	if (strcmp(args[0], "exit") == 0) {
 		exit(0);
 	} else if (strcmp(args[0], "cd") == 0) {
-		if (elems == 1) {
-			std::filesystem::current_path(std::getenv("HOME"));
-		} else if (elems == 2) {
-			std::filesystem::path newpath = std::string(args[1]);
-			if (std::filesystem::is_directory(newpath)) {
-				std::filesystem::current_path(newpath);
-			} else {
-				std::cout << "Error: Invalid directory";
-			}
-		} else {
-			std::cout << "Error: Too many arguments.";
-		}
+		executecd(args, elems);
 	} else {
 		callCommand(args);
 	}
@@ -64,6 +81,7 @@ void executeLine(const std::string& str) {
 	std::string command = str.substr(prev);
 	executeCommand(command);
 }
+
 void runInteractiveMode() {
 	std::string line;
 	while (true) {
