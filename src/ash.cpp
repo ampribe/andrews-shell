@@ -1,3 +1,4 @@
+/*
 #include <iostream>
 #include <stdexcept>
 #include <string>
@@ -7,8 +8,38 @@
 #include <filesystem>
 #include <cstdlib>
 #include <fstream>
+#include <cctype>
 #include <fcntl.h>
 #include <unistd.h>
+
+struct Command {
+	std::vector<std::string> args;
+	char* stderrRedirect = nullptr;
+	char* stdinRedirect = nullptr;
+	char* stdoutRedirect = nullptr;
+	bool stderrRedirectAppend = false;
+	bool stdoutRedirectAppend = false;
+	bool pipeIn = false;
+	bool pipeOut = false;
+	bool background = false;
+};
+
+void tokenize(const std::string& line) {
+	int start = 0;
+	int current = 0;
+	std::vector<Command> commands;
+	Command cmd;
+	bool escape = false;
+	bool quotes = false;
+	//bool variable = false;
+	//bool command = false;
+	// Implement variable expansion and command substitution later
+	for (int current = 0; current < line.length(); current++) {
+		if (isspace(line[current])) {
+			if (
+		}
+	}
+}
 
 void callCommand(char* args[]) {
 	int status;
@@ -115,3 +146,4 @@ int main(int argc, char* argv[]) {
 	}
 	return 0;
 }
+*/
