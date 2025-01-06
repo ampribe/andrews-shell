@@ -1,16 +1,11 @@
 #include <iostream>
 #include <stdexcept>
 #include <string>
-#include <cstring>
 #include <vector>
 #include <regex>
-#include <filesystem>
-#include <cstdlib>
-#include <fstream>
-#include <cctype>
-#include <fcntl.h>
-#include <unistd.h>
 #include <set>
+#include <optional>
+#include <regex>
 
 enum Type { special, quote, literal, eof};
 // operators: |, [n]<, [n]>>, [n]>, ;
@@ -18,39 +13,50 @@ enum Type { special, quote, literal, eof};
 
 struct Token {
 	Type type;
-	std::string* value;
+	std::string value;
 };
 
 class LineParser {
 public:
-	LineParser(std::string s) :line { s }, pos { 0 } { }
-	int getToken(Token** ptr) {
-		while (pos < line.length() && isspace(line[pos])) {
-			pos++;
-		}
+	LineParser(std::string s) :line {s}, pos {0} {}
+	std::optional<Token> getToken() {
+		findToken();
 		if (pos == line.length()) {
-			*ptr = new Token {Type::eof, nullptr};
-			return 0;
+			return Token {Type::eof, ""};
 		}
 		if (line[pos] == '"') {
-			return parseQuote(ptr);
+			return parseQuote();
 		}
-		return parseLiteral(ptr);
+		return parseLiteral();
 	}
 private:
 	std::string line;
 	size_t pos;
-	int parseQuote(Token** ptr) {
-		int closeLocation = line.find('"', pos+1);
-		if (closeLocation < line.length()) {
-			*ptr = new Token { Type::quote, new std::string{line.substr(pos+1, closeLocation-pos-1)} };
-			pos = closeLocation+1;
-			return 0;
+	void findToken() {
+		while (pos < line.length() && isspace(line[pos])) {
+			pos++;
 		}
-		return 1;
 	}
-	int parseLiteral(Token** ptr) {
-		std::set<std::string> special = {"|", ">>", "<", ">", ";"};
+	std::optional<Token> parseQuote() {
+		std::string value;
+		pos++;
+		while (pos < line.length() && line[pos] != '"') {
+			value += line[pos];
+			pos++;
+		}
+		if (pos == line.length()) {
+			std::cout << "Error: Unclosed quote.";
+			return std::nullopt;
+		}
+		pos++;
+		return Token {Type::quote, std::move(value)};
+	}
+	bool isRedirect(std::string s) {
+		std::regex r(R"([&\d]?>>?(&\d)?|<)");
+		return std::regex_match(s, r);
+	}
+	std::optional<Token> parseLiteral() {
+		std::set<std::string> special = {"|", ";"};
 		std::string s = "";
 		bool escape = false;
 		while (pos < line.length() && !isspace(line[pos])) {
@@ -61,13 +67,10 @@ private:
 			}
 			pos++;
 		}
-		std::string* sptr = new std::string{ s };
-		if (!escape && special.find(*sptr) != special.end()) {
-			*ptr = new Token { Type::special, sptr };
-		} else {
-			*ptr = new Token { Type::literal, sptr };
+		if (!escape && (s == "|" || s == ";" || isRedirect(s))) {
+			return Token {Type::special, std::move(s)};
 		}
-		return 0;
+		return Token {Type::literal, std::move(s)};
 	}
 };
 
@@ -75,12 +78,11 @@ int main(int argc, char* argv[]) {
 	std::string line;
 	std::getline(std::cin, line);
 	LineParser parser(line);
-	Token* t;
-	parser.getToken(&t);
-	while (t->type != Type::eof) {
-		std::cout << "Token: " << *t->value << " Type: " << t->type << "\n";
-		parser.getToken(&t);
+	Token t = parser.getToken().value_or(Token{Type::eof, ""});
+	while (t.type != Type::eof) {
+		std::cout << "Token: " << t.value << " Type: " << t.type << "\n";
+		t = parser.getToken().value_or(Token {Type::eof, ""});
 	}
-	std::cout << "finished";
+	std::cout << "finished\n";
 	return 0;
 }
