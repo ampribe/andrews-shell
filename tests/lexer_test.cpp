@@ -127,3 +127,20 @@ TEST_F(LexerTest, Redirection2) {
 	testLexer(input, expected);
 }
 
+TEST_F(LexerTest, Redirection3) {
+	std::string input = "2>&1 <<<< &> 2>> 1>&2 >";
+	std::vector<std::pair<Type, std::string>> expected = {
+		{Type::REDIRECT, "2>&1"},
+		{Type::REDIRECT, "<"},
+		{Type::REDIRECT, "<"},
+		{Type::REDIRECT, "<"},
+		{Type::REDIRECT, "<"},
+		{Type::REDIRECT, "&>"},
+		{Type::REDIRECT, "2>>"},
+		{Type::REDIRECT, "1>&2"},
+		{Type::REDIRECT, ">"},
+		{Type::END, ""}
+	};
+	testLexer(input, expected);
+}
+
