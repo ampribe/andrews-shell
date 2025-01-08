@@ -15,10 +15,26 @@ public:
 		if (pos == line.length()) {
 			return Token {Type::END, ""};
 		}
+		if (line[pos] == '|') {
+			pos++;
+			return Token {Type::PIPE, "|"};
+		}
+		if (line[pos] == ';') {
+			pos++;
+			return Token {Type::SEMI, ";"};
+		}
+		if (line[pos] == '&' && (pos + 1 == line.length() || line[pos + 1] != '>')) {
+			pos++;
+			return Token {Type::CONTROL, "&"};
+		}
 		if (line[pos] == '"') {
 			return lexQuote();
 		}
-		return lexLiteralOrSpecial();
+		std::optional<Token> tok = lexRedirect();
+		if (tok.has_value()) {
+			return tok.value();
+		}
+		return lexLiteral();
 	}
 private:
 	std::string line;
@@ -42,61 +58,54 @@ private:
 		pos++;
 		return Token {Type::QUOTE, std::move(value)};
 	}
-	bool isRedirect(std::string s) {
-		std::regex r(R"([&\d]?>>?(&\d)?|<)");
-		return std::regex_match(s, r);
-	}
-	bool isSpecial(std::string s) {
-		return s == "|" || s == "&" || s == ";" || isRedirect(s);
-	}
-	Type getSpecialType(std::string s) {
-		if (s == "|") {
-			return Type::PIPE;
-		} else if (s == "&") {
-			return Type::CONTROL;
-		} else if (s == ";") {
-			return Type::SEMI;
-		} else {
-			return Type::REDIRECT;
+	// If current position points to redirect, greedy reads redirect and updates position
+	// Redirect in form: 1) >, <, 2) \d>, >>, &>, 3) \d>>, &>>, >&\d, 4) \d>&\d
+	std::optional<Token> lexRedirect() {
+		std::regex pattern;
+		std::string s;
+		if (pos + 3 < line.length()) {
+			pattern.assign(R"(\d>&\d)");
+			s = line.substr(pos, 4);
+			if (std::regex_match(s, pattern)) {
+				pos += 4;
+				return Token {Type::REDIRECT, std::move(s)};
+			}
 		}
-	}
-	Token lexLiteralOrSpecial() {
-		std::string str;
-		str.push_back(line[pos]);
-		if (isSpecial(str)) {
-			return lexSpecial();
-		} else if (std::isdigit(line[pos])) {
-			if (pos + 1 < line.length()) {
-				str.push_back(line[pos+1]);
-				if (isSpecial(str)) {
-					return lexSpecial();
-				}
+		if (pos + 2 < line.length()) {
+			pattern.assign(R"(([\d&]>>)|(>&\d))");
+			s = line.substr(pos, 3);
+			if (std::regex_match(s, pattern)) {
+				pos += 3;
+				return Token {Type::REDIRECT, std::move(s)};
 			}
-		} 
-		return lexLiteral();
-	}
-	Token lexSpecial() {
-		std::string str;
-		str.push_back(line[pos]);
-		pos++;
-		while (pos < line.length()) {
-			str.push_back(line[pos]);
-			if (!isSpecial(str)) {
-				str.pop_back();
-				return Token {getSpecialType(str), std::move(str)};
+		}
+		if (pos + 1 < line.length()) {
+			pattern.assign(R"([\d>&]>)");
+			s = line.substr(pos, 2);
+			if (std::regex_match(s, pattern)) {
+				pos += 2;
+				return Token {Type::REDIRECT, std::move(s)};
 			}
+		}
+		if (line[pos] == '>') {
 			pos++;
+			return Token {Type::REDIRECT, ">"};
 		}
-		return Token {getSpecialType(str), std::move(str)};
+		if (line[pos] == '<') {
+			pos++;
+			return Token {Type::REDIRECT, "<"};
+		}
+		return std::nullopt;
+	}
+	bool isSpecial(char c) {
+		return c == '|' || c == '&' || c == ';' || c == '<' || c == '>';
 	}
 	Token lexLiteral() {
 		std::string s = "";
 		bool escape = false;
 		while (pos < line.length() && !isspace(line[pos])) {
 			if (line[pos] != '\\') {
-				std::string str;
-				str.push_back(line[pos]);
-				if (!escape && isSpecial(str)) {
+				if (!escape && isSpecial(line[pos])) {
 					break;
 				}
 				s.push_back(line[pos]);
