@@ -105,7 +105,7 @@ TEST_F(LexerTest, MultipleCommands) {
 }
 
 TEST_F(LexerTest, Redirection1) {
-	std::string input = ">> <<";
+	std::string input = ">> \\<\\<";
 	std::vector<std::pair<Type, std::string>> expected = {
 		{Type::REDIRECT, ">>"},
 		{Type::LITERAL, "<<"},
