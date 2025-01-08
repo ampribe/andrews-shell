@@ -5,12 +5,14 @@
 #include <regex>
 #include <optional>
 #include <cctype>
+#include <variant>
 #include <token.h>
+#include <shellerror.h>
 
 class Lexer {
 public:
 	Lexer(std::string s) :line {s}, pos {0} {}
-	Token getToken() {
+	std::variant<Token, ShellError> getToken() {
 		findToken();
 		if (pos == line.length()) {
 			return Token {Type::END, ""};
@@ -44,7 +46,7 @@ private:
 			pos++;
 		}
 	}
-	Token lexQuote() {
+	std::variant<Token, ShellError> lexQuote() {
 		std::string value;
 		pos++;
 		while (pos < line.length() && line[pos] != '"') {
@@ -52,8 +54,7 @@ private:
 			pos++;
 		}
 		if (pos == line.length()) {
-			std::cout << "Error: Unclosed quote.";
-			return Token {Type::END, ""};
+			return ShellError {ErrorType::UNCLOSED_QUOTE, "Error: Unclosed Quote"};
 		}
 		pos++;
 		return Token {Type::QUOTE, std::move(value)};
