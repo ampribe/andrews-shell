@@ -4,6 +4,7 @@
 #include <vector>
 #include <regex>
 #include <optional>
+#include <cctype>
 #include <token.h>
 
 class Lexer {
@@ -17,7 +18,7 @@ public:
 		if (line[pos] == '"') {
 			return lexQuote();
 		}
-		return lexLiteral();
+		return lexLiteralOrSpecial();
 	}
 private:
 	std::string line;
@@ -48,34 +49,62 @@ private:
 	bool isSpecial(std::string s) {
 		return s == "|" || s == "&" || s == ";" || isRedirect(s);
 	}
+	Type getSpecialType(std::string s) {
+		if (s == "|") {
+			return Type::PIPE;
+		} else if (s == "&") {
+			return Type::CONTROL;
+		} else if (s == ";") {
+			return Type::SEMI;
+		} else {
+			return Type::REDIRECT;
+		}
+	}
+	Token lexLiteralOrSpecial() {
+		std::string str;
+		str.push_back(line[pos]);
+		if (isSpecial(str)) {
+			return lexSpecial();
+		} else if (std::isdigit(line[pos])) {
+			if (pos + 1 < line.length()) {
+				str.push_back(line[pos+1]);
+				if (isSpecial(str)) {
+					return lexSpecial();
+				}
+			}
+		} 
+		return lexLiteral();
+	}
+	Token lexSpecial() {
+		std::string str;
+		str.push_back(line[pos]);
+		pos++;
+		while (pos < line.length()) {
+			str.push_back(line[pos]);
+			if (!isSpecial(str)) {
+				str.pop_back();
+				return Token {getSpecialType(str), std::move(str)};
+			}
+			pos++;
+		}
+		return Token {getSpecialType(str), std::move(str)};
+	}
 	Token lexLiteral() {
-		//handle cases wwhere command sequences aren't separated by spaces
 		std::string s = "";
 		bool escape = false;
-		bool prevEscape = false;
 		while (pos < line.length() && !isspace(line[pos])) {
 			if (line[pos] != '\\') {
+				std::string str;
+				str.push_back(line[pos]);
+				if (!escape && isSpecial(str)) {
+					break;
+				}
 				s.push_back(line[pos]);
 				escape = false;
 			} else {
 				escape = true;
-				prevEscape = true;
 			}
 			pos++;
-		}
-		if (!escape && isSpecial(s)) {
-			if (s == "|") {
-				return Token {Type::PIPE, std::move(s)};
-			}
-			if (s == ";") {
-				return Token {Type::SEMI, std::move(s)};
-			}
-			if (s == "&") {
-				return Token {Type::CONTROL, std::move(s)};
-			}
-			if (isRedirect(s)) {
-				return Token {Type::REDIRECT, std::move(s)};
-			}
 		}
 		return Token {Type::LITERAL, std::move(s)};
 	}
