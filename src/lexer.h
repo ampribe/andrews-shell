@@ -1,3 +1,6 @@
+#ifndef LEXER_H
+#define LEXER_H
+
 #include <iostream>
 #include <stdexcept>
 #include <string>
@@ -6,8 +9,8 @@
 #include <optional>
 #include <cctype>
 #include <variant>
-#include <token.h>
-#include <shellerror.h>
+#include "token.h"
+#include "shellerror.h"
 
 class Lexer {
 public:
@@ -15,7 +18,7 @@ public:
 	std::variant<Token, ShellError> getToken() {
 		findToken();
 		if (pos == line.length()) {
-			return Token {Type::END, ""};
+			return Token {};
 		}
 		if (line[pos] == '|') {
 			pos++;
@@ -119,4 +122,4 @@ private:
 		return Token {Type::LITERAL, std::move(s)};
 	}
 };
-
+#endif
