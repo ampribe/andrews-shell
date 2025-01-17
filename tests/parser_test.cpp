@@ -87,3 +87,70 @@ TEST_F(ParserTest, Pipeline3) {
 	std::vector<std::variant<Pipeline, ShellError>> expected = {};
 	testParser(input, expected);
 }
+
+TEST_F(ParserTest, Redirect1) {
+	std::string input = "ls -la > out.txt";
+	std::vector<std::variant<Pipeline, ShellError>> expected = {
+		Pipeline {
+			.commands = {
+				{
+					.args = {"ls", "-la"},
+					.redirections = {
+						{
+							.type = RedirectType::OUT,
+							.file = "out.txt"
+						}
+					}
+				}
+			}
+		}
+	};
+	testParser(input, expected);
+}
+
+TEST_F(ParserTest, Redirect2) {
+	std::string input = "ls -la &> out.txt";
+	std::vector<std::variant<Pipeline, ShellError>> expected = {
+		Pipeline {
+			.commands = {
+				{
+					.args = {"ls", "-la"},
+					.redirections = {
+						{
+							.type = RedirectType::OUT,
+							.fdFrom = 1,
+							.file = "out.txt"
+						},
+						{
+							.type = RedirectType::OUT,
+							.fdFrom = 2,
+							.file = "out.txt"
+						}
+					}
+				}
+			}
+		}
+	};
+	testParser(input, expected);
+}
+
+TEST_F(ParserTest, Redirect3) {
+	std::string input = "ls -la 2>&1 out.txt";
+	std::vector<std::variant<Pipeline, ShellError>> expected = {
+		Pipeline {
+			.commands = {
+				{
+					.args = {"ls", "-la", "out.txt"},
+					.redirections = {
+						{
+							.type = RedirectType::OUT,
+							.fdFrom = 2,
+							.fdTo = 1,
+						}
+					}
+				}
+			}
+		}
+	};
+	testParser(input, expected);
+}
