@@ -22,8 +22,8 @@ protected:
 TEST_F(LexerTest, EmptyInput) {
 	std::string input = "";
 	std::vector<std::variant<Token, ShellError>> expected = {
-		Token {Type::END, ""},
-		Token {Type::END, ""}
+		Token {Type::END, "END"},
+		Token {Type::END, "END"}
 	};
 	testLexer(input, expected);
 }
@@ -33,7 +33,7 @@ TEST_F(LexerTest, SingleCommand1) {
 	std::vector<std::variant<Token, ShellError>> expected = {
 		Token {Type::LITERAL, "echo"},
 		Token {Type::LITERAL, "asdf"},
-		Token {Type::END, ""}
+		Token {Type::END, "END"}
 	};
 	testLexer(input, expected);
 }
@@ -45,7 +45,7 @@ TEST_F(LexerTest, SingleCommand2) {
 		Token {Type::LITERAL, "asdf"},
 		Token {Type::LITERAL, "123"},
 		Token {Type::QUOTE, "%%%"},
-		Token {Type::END, ""}
+		Token {Type::END, "END"}
 	};
 	testLexer(input, expected);
 }
@@ -56,7 +56,7 @@ TEST_F(LexerTest, SingleCommand3) {
 		Token {Type::LITERAL, "asdf"},
 		Token {Type::LITERAL, "123"},
 		Token {Type::QUOTE, "%%%"},
-		Token {Type::END, ""}
+		Token {Type::END, "END"}
 	};
 	testLexer(input, expected);
 }
@@ -68,7 +68,7 @@ TEST_F(LexerTest, Pipeline1) {
 		Token {Type::LITERAL, "123"},
 		Token {Type::PIPE, "|"},
 		Token {Type::QUOTE, "%%%"},
-		Token {Type::END, ""}
+		Token {Type::END, "END"}
 	};
 	testLexer(input, expected);
 }
@@ -83,7 +83,7 @@ TEST_F(LexerTest, Pipeline2) {
 		Token {Type::LITERAL, "123"},
 		Token {Type::PIPE, "|"},
 		Token {Type::QUOTE, "%%%"},
-		Token {Type::END, ""}
+		Token {Type::END, "END"}
 	};
 	testLexer(input, expected);
 }
@@ -99,7 +99,7 @@ TEST_F(LexerTest, MultipleCommands) {
 		Token {Type::LITERAL, "123"},
 		Token {Type::PIPE, "|"},
 		Token {Type::QUOTE, "%%%"},
-		Token {Type::END, ""}
+		Token {Type::END, "END"}
 	};
 	testLexer(input, expected);
 }
@@ -109,7 +109,7 @@ TEST_F(LexerTest, Redirection1) {
 	std::vector<std::variant<Token, ShellError>> expected = {
 		Token {Type::REDIRECT, ">>"},
 		Token {Type::LITERAL, "<<"},
-		Token {Type::END, ""}
+		Token {Type::END, "END"}
 	};
 	testLexer(input, expected);
 }
@@ -122,7 +122,7 @@ TEST_F(LexerTest, Redirection2) {
 		Token {Type::REDIRECT, "2>>"},
 		Token {Type::REDIRECT, "1>&2"},
 		Token {Type::REDIRECT, ">"},
-		Token {Type::END, ""}
+		Token {Type::END, "END"}
 	};
 	testLexer(input, expected);
 }
@@ -139,7 +139,7 @@ TEST_F(LexerTest, Redirection3) {
 		Token {Type::REDIRECT, "2>>"},
 		Token {Type::REDIRECT, "1>&2"},
 		Token {Type::REDIRECT, ">"},
-		Token {Type::END, ""}
+		Token {Type::END, "END"}
 	};
 	testLexer(input, expected);
 }
