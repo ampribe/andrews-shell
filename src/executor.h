@@ -63,9 +63,17 @@ private:
 		pid_t pid = fork();
 		char** args = convertArgs(cmd.args);
 		if (pid == 0) {
+			if (cmd.background) {
+				setsid();
+			}
 			execvp(args[0], args);
 		} else {
-			wait(&status);
+			// weird bug here
+			if (cmd.background) {
+				std::cout << "[" << pid << "] " << args[0] << std::endl;
+			} else {
+				wait(&status);
+			}
 		}
 	}
 	void executeCd(const Command& cmd) {
