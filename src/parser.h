@@ -1,3 +1,6 @@
+#ifndef PARSER_H
+#define PARSER_H
+
 #include <iostream>
 #include <string>
 #include <vector>
@@ -62,7 +65,7 @@ struct Pipeline {
 	}
 };
 
-std::ostream& operator<<(std::ostream& os, const std::variant<Pipeline, ShellError>& v) {
+inline std::ostream& operator<<(std::ostream& os, const std::variant<Pipeline, ShellError>& v) {
     std::visit([&os](const auto& val) { os << val; }, v);
     return os;
 }
@@ -285,3 +288,4 @@ private:
 		return error;
 	}
 };
+#endif
