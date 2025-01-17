@@ -12,6 +12,10 @@ struct ShellError {
 	bool operator==(const ShellError& other) const {
 		return type == other.type && message == other.message;
 	}
+	friend std::ostream& operator<<(std::ostream& os, const ShellError& error) {
+		os << error.message;
+		return os;
+	}
 };
 
 #endif
