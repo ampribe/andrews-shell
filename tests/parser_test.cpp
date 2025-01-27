@@ -25,8 +25,6 @@ TEST_F(ParserTest, BasicInput) {
 			.commands = {
 				{
 					.args = {"echo", "blah"},
-					.redirections = {},
-					.background = false
 				}
 			}
 		}
@@ -49,13 +47,9 @@ TEST_F(ParserTest, Pipeline1) {
 			.commands = {
 				{
 					.args = {"ls", "-la"},
-					.redirections = {},
-					.background = false
 				},
 				{
 					.args = {"cat"},
-					.redirections = {},
-					.background = false
 				}
 			}
 		}
@@ -95,11 +89,8 @@ TEST_F(ParserTest, Redirect1) {
 			.commands = {
 				{
 					.args = {"ls", "-la"},
-					.redirections = {
-						{
-							.type = RedirectType::OUT,
-							.file = "out.txt"
-						}
+					.redirection = {
+						.coutFile = "out.txt",
 					}
 				}
 			}
@@ -115,17 +106,9 @@ TEST_F(ParserTest, Redirect2) {
 			.commands = {
 				{
 					.args = {"ls", "-la"},
-					.redirections = {
-						{
-							.type = RedirectType::OUT,
-							.fdFrom = 1,
-							.file = "out.txt"
-						},
-						{
-							.type = RedirectType::OUT,
-							.fdFrom = 2,
-							.file = "out.txt"
-						}
+					.redirection = {
+						.coutFile = "out.txt",
+						.cerrFile = "out.txt"
 					}
 				}
 			}
@@ -141,12 +124,8 @@ TEST_F(ParserTest, Redirect3) {
 			.commands = {
 				{
 					.args = {"ls", "-la", "out.txt"},
-					.redirections = {
-						{
-							.type = RedirectType::OUT,
-							.fdFrom = 2,
-							.fdTo = 1,
-						}
+					.redirection = {
+						.cerrTo = 1,
 					}
 				}
 			}
