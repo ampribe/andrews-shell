@@ -9,66 +9,7 @@
 #include "lexer.h"
 #include "token.h"
 #include "shellerror.h"
-
-enum RedirectType { IN, OUT, APPEND };
-
-struct Redirect {
-	RedirectType type;
-	int fdFrom{1};
-	int fdTo{0};
-	std::string file{""};
-
-	bool operator==(const Redirect& other) const {
-		return type == other.type && fdFrom == other.fdFrom && fdTo == other.fdTo && file == other.file;
-	}
-	friend std::ostream& operator<<(std::ostream& os, const Redirect& redirect) {
-		os << "{" << redirect.type << ", " << redirect.fdFrom << ", " << redirect.fdTo << ", " << redirect.file << "}";
-		return os;
-	}
-};
-
-struct Command {
-	std::vector<std::string> args{};
-	std::vector<Redirect> redirections{};
-	bool background{false};
-	
-	bool operator==(const Command& other) const {
-		return args == other.args && redirections == other.redirections && background == other.background;
-	}
-	friend std::ostream& operator<<(std::ostream& os, const Command& cmd) {
-		os << "Command {\nArgs: [";
-		for (const auto& arg : cmd.args) {
-			os << arg << ", ";
-		}
-		os << "]\nRedirections[";
-		for (const auto& redirection : cmd.redirections) {
-			os << redirection << ", ";
-		}
-		os << "]\n}\n";
-		return os;
-	}
-};
-
-struct Pipeline {
-	std::vector<Command> commands;
-
-	bool operator==(const Pipeline& other) const {
-		return commands == other.commands;
-	}
-	friend std::ostream& operator<<(std::ostream& os, const Pipeline& pipeline) {
-		os << "\nPipeline{\n";
-		for (const auto& cmd : pipeline.commands) {
-			os << cmd;
-		}
-		os << "}";
-		return os;
-	}
-};
-
-inline std::ostream& operator<<(std::ostream& os, const std::variant<Pipeline, ShellError>& v) {
-    std::visit([&os](const auto& val) { os << val; }, v);
-    return os;
-}
+#include "pipeline.h"
 
 class Parser {
 public:
@@ -146,13 +87,11 @@ private:
 				command.args.push_back(std::move(currentToken.value));
 				getToken();
 			} else if (isTokenType(Type::REDIRECT)) {
-				auto result = readRedirect();
-				if (std::holds_alternative<ShellError>(result)) {
+				auto result = readRedirect(command);
+				if (result == 1) {
 					advanceToCommandEnd();
-					return std::get<ShellError>(token);
+					return ShellError {ErrorType::SYNTAX_ERROR, "Error: Invalid redirection."};
 				}
-				std::vector<Redirect> res = std::get<std::vector<Redirect>>(result);
-				command.redirections.insert(command.redirections.end(), res.begin(), res.end());
 			} else {
 				command.background = true;
 				getToken();
@@ -171,121 +110,104 @@ private:
 		Token tok = std::get<Token>(token);
 		return std::move(tok.value);
 	}
-	std::variant<std::vector<Redirect>, ShellError> readRedirect() {
-		ShellError error = {ErrorType::SYNTAX_ERROR, "Error: Invalid redirection."};
+	int readRedirect(Command& cmd) {
 		Token tok = std::get<Token>(token);
 		getToken();
 		if (tok.value == "<") {
 			if (isArgument()) {
-				auto res = std::vector<Redirect>{{.type = RedirectType::IN, .file = getArgument()}};
+				cmd.redirection.cinFile = getArgument();
 				getToken();
-				return res;
+				return 0;
 			}
-			return error;
+			return 1;
 		} else if (tok.value == ">") {
 			if (isArgument()) {
-				auto res = std::vector<Redirect>{{.type = RedirectType::OUT, .file = getArgument()}};
+				cmd.redirection.coutFile = getArgument();
 				getToken();
-				return res;
+				return 0;
 			}
-			return error;
+			return 1;
 		} else if (tok.value == ">>") {
 			if (isArgument()) {
-				auto res = std::vector<Redirect>{{.type = RedirectType::APPEND, .file = getArgument()}};
+				cmd.redirection.coutFile = getArgument();
+				cmd.redirection.coutFileAppend = true;
 				getToken();
-				return res;
+				return 0;
 			}
-			return error;
+			return 1;
 		} else if (tok.value == "&>") {
 			if (isArgument()) {
-				auto res = std::vector<Redirect>{
-					Redirect {
-						.type = RedirectType::OUT,
-						.fdFrom = 1,
-						.file = getArgument()
-					},
-					Redirect {
-						.type = RedirectType::OUT,
-						.fdFrom = 2,
-						.file = getArgument()
-					},
-				};
+				cmd.redirection.coutFile = getArgument();
+				cmd.redirection.cerrFile = getArgument();
 				getToken();
-				return res;
-			} 
-			return error;
+				return 0;
+			}
+			return 1;
 		} else if (tok.value == "&>>") {
 			if (isArgument()) {
-				auto res = std::vector<Redirect>{
-					Redirect {
-						.type = RedirectType::APPEND,
-						.fdFrom = 1,
-						.file = getArgument()
-					},
-					Redirect {
-						.type = RedirectType::APPEND,
-						.fdFrom = 2,
-						.file = getArgument()
-					},
-				};
+				cmd.redirection.coutFile = getArgument();
+				cmd.redirection.cerrFile = getArgument();
+				cmd.redirection.coutFileAppend = true;
+				cmd.redirection.cerrFileAppend = true;
 				getToken();
-				return res;
-			} 
-			return error;
+				return 0;
+			}
+			return 1;
 		}
 		std::regex pattern;
 		std::smatch matches;
 		pattern.assign(R"((\d)>&(\d))");
 		if (std::regex_search(tok.value, matches, pattern)) {
-			return std::vector<Redirect> {
-				Redirect {
-					.type = RedirectType::OUT,
-					.fdFrom = std::stoi(matches[1]),
-					.fdTo = std::stoi(matches[2])
-				}
-			};
+			if (std::stoi(matches[1]) == 1) {
+				cmd.redirection.coutTo = std::stoi(matches[2]);
+			} else if (std::stoi(matches[1]) == 2) {
+				cmd.redirection.cerrTo = std::stoi(matches[2]);
+			} else {
+				return 1;
+			}
+			return 0;
 		}
 		pattern.assign(R"((\d)>>)");
 		if (std::regex_search(tok.value, matches, pattern)) {
 			if (isArgument()) {
-				auto res = std::vector<Redirect>{
-					{
-						.type = RedirectType::APPEND,
-						.fdFrom = std::stoi(matches[1]),
-						.file = getArgument()
-					}
-				};
+				if (std::stoi(matches[1]) == 1) {
+					cmd.redirection.coutFile = getArgument();
+					cmd.redirection.coutFileAppend = true;
+				} else if (std::stoi(matches[1]) == 2) {
+					cmd.redirection.cerrFile = getArgument();
+					cmd.redirection.cerrFileAppend = true;
+				} else {
+					return 1;
+				}
 				getToken();
-				return res;
+				return 0;
 			}
-			return error;
+			return 1;
 		}
 		pattern.assign(R"(>&(\d))");
 		if (std::regex_search(tok.value, matches, pattern)) {
-			return std::vector<Redirect> {
-				Redirect {
-					.type = RedirectType::OUT,
-					.fdFrom = 1,
-					.fdTo = std::stoi(matches[1])
-				}
-			};
+			if (std::stoi(matches[1]) == 2) {
+				cmd.redirection.coutTo = 2;
+				return 0;
+			} else {
+				return 1;
+			}
 		}
 		pattern.assign(R"((\d)>)");
 		if (std::regex_search(tok.value, matches, pattern)) {
 			if (isArgument()) {
-				auto res = std::vector<Redirect>{
-					{
-						.type = RedirectType::OUT,
-						.fdFrom = std::stoi(matches[1]),
-						.file = getArgument()
-					}
-				};
+				if (std::stoi(matches[1]) == 1) {
+					cmd.redirection.coutFile = getArgument();
+				} else if (std::stoi(matches[1]) == 2) {
+					cmd.redirection.cerrFile = getArgument();
+				} else {
+					return 1;
+				}
 				getToken();
-				return res;
+				return 0;
 			}
-			return error;
 		}
-		return error;
+		return 1;
 	}
 };
 #endif
