@@ -35,19 +35,68 @@ public:
 	}
 private:
 	void executePipeline(const Pipeline& pipeline) {
-		for (const auto& cmd : pipeline.commands) {
-			executeCommand(cmd);
-		}
-	}
-	void executeCommand(const Command& cmd) {
-		if (!cmd.args.empty()) {
-			if (cmd.args[0] == "exit") {
+		const size_t numCommands = pipeline.commands.size();
+		int prevPipeFd[2] = {-1, -1};
+		std::vector<pid_t> pids;
+
+		for (size_t i = 0; i < numCommands; i++) {
+			if (pipeline.commands[i].args[0] == "exit") {
+					if (prevPipeFd[0] != -1) close(prevPipeFd[0]);
+					if (prevPipeFd[1] != -1) close(prevPipeFd[1]);
+
+					for (pid_t pid : pids) {
+						int status;
+						waitpid(pid, &status, 0);
+				}
 				exit(0);
-			} else if (cmd.args[0] == "cd") {
-				executeCd(cmd);
-			} else {
-				callCommand(cmd);
+			} else if (pipeline.commands[i].args[0] == "cd") {
+				executeCd(pipeline.commands[i]);
+				continue;
 			}
+			bool pipeIn = i > 0;
+			bool pipeOut = i < numCommands - 1;
+			int currPipeFd[2] = {-1, -1};
+			if (pipeOut) {
+				if (pipe(currPipeFd) == -1) {
+					throw std::runtime_error("Failed to create pipe");
+				}
+			}
+
+			pid_t pid = fork();
+			if (pid < 0) {
+				throw std::runtime_error("Fork failed");
+			} else if (pid == 0) {
+				if (pipeIn) {
+					dup2(prevPipeFd[0], STDIN_FILENO);
+				}
+				if (pipeOut) {
+					dup2(currPipeFd[1], STDOUT_FILENO);
+				}
+				if (prevPipeFd[0] != -1) close(prevPipeFd[0]);
+				if (prevPipeFd[1] != -1) close(prevPipeFd[1]);
+				if (currPipeFd[0] != -1) close(currPipeFd[0]);
+				if (currPipeFd[1] != -1) close(currPipeFd[1]);
+				callCommand(pipeline.commands[i], pipeIn, pipeOut);
+
+				exit(EXIT_FAILURE);
+			} else {
+				pids.push_back(pid);
+
+				if (pipeIn) {
+					close(prevPipeFd[0]);
+					close(prevPipeFd[1]);
+				}
+				prevPipeFd[0] = currPipeFd[0];
+				prevPipeFd[1] = currPipeFd[1];
+			}
+		}
+
+		if (prevPipeFd[0] != -1) close(prevPipeFd[0]);
+		if (prevPipeFd[1] != -1) close(prevPipeFd[1]);
+
+		for (pid_t pid : pids) {
+			int status;
+			waitpid(pid, &status, 0);
 		}
 	}
 	char** convertArgs(std::vector<std::string> vec) {
@@ -59,19 +108,19 @@ private:
 		args[vec.size()] = nullptr;
 		return args;
 	}
-	void callCommand(const Command& cmd) {
+	void callCommand(const Command& cmd, bool pipeIn, bool pipeOut) {
 		int coutfd = -1;
 		int cinfd = -1;
 		int cerrfd = -1;
 		int status;
 
-		if (cmd.redirection.coutFile != "") {
+		if (cmd.redirection.coutFile != "" && !pipeIn) {
 			coutfd = open(cmd.redirection.coutFile.c_str(), O_WRONLY | O_CREAT | (cmd.redirection.coutFileAppend ? O_APPEND : O_TRUNC), 0644);
 		}
 		if (cmd.redirection.cerrFile != "") {
 			cerrfd = open(cmd.redirection.cerrFile.c_str(), O_WRONLY | O_CREAT | (cmd.redirection.cerrFileAppend ? O_APPEND : O_TRUNC), 0644);
 		}
-		if (cmd.redirection.cinFile != "") {
+		if (cmd.redirection.cinFile != "" && !pipeOut) {
 			cinfd = open(cmd.redirection.cinFile.c_str(), O_RDONLY);
 		}
 		
