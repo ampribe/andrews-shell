@@ -68,9 +68,7 @@ private:
 			}
 			pipeline.commands.push_back(std::get<Command>(command));
 		} while (isTokenType(Type::PIPE));
-		if (isTokenType(Type::SEMI)) {
-			getToken();
-		}
+
 		return pipeline;
 	}
 	//Advance to delimiter ending command
