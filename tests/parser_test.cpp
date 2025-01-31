@@ -32,6 +32,27 @@ TEST_F(ParserTest, BasicInput) {
 	testParser(input, expected);
 }
 
+TEST_F(ParserTest, MultipleCommands) {
+	std::string input = "echo blah; echo blah2";
+	std::vector<std::variant<Pipeline, ShellError>> expected = {
+		Pipeline {
+			.commands = {
+				{
+					.args = {"echo", "blah"},
+				}
+			}
+		},
+		Pipeline {
+			.commands = {
+				{
+					.args = {"echo", "blah2"},
+				}
+			}
+		}
+	};
+	testParser(input, expected);
+}
+
 TEST_F(ParserTest, BasicError) {
 	std::string input = "& blah";
 	std::vector<std::variant<Pipeline, ShellError>> expected = {
