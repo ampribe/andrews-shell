@@ -29,26 +29,27 @@ public:
 				std::cout << ptr->message << std::endl;
 			} else {
 				auto pipeline = std::get<Pipeline>(item);
-				executePipeline(pipeline);
+				if (!executePipeline(pipeline)) {
+					exit(0);
+				}
 			}
 		}
 	}
 private:
-	void executePipeline(const Pipeline& pipeline) {
+	bool executePipeline(const Pipeline& pipeline) {
 		const size_t numCommands = pipeline.commands.size();
 		int prevPipeFd[2] = {-1, -1};
 		std::vector<pid_t> pids;
 
 		for (size_t i = 0; i < numCommands; i++) {
 			if (pipeline.commands[i].args[0] == "exit") {
-					if (prevPipeFd[0] != -1) close(prevPipeFd[0]);
-					if (prevPipeFd[1] != -1) close(prevPipeFd[1]);
-
-					for (pid_t pid : pids) {
-						int status;
-						waitpid(pid, &status, 0);
+				if (prevPipeFd[0] != -1) close(prevPipeFd[0]);
+				if (prevPipeFd[1] != -1) close(prevPipeFd[1]);
+				for (pid_t pid : pids) {
+					int status;
+					waitpid(pid, &status, 0);
 				}
-				exit(0);
+				return false;
 			} else if (pipeline.commands[i].args[0] == "cd") {
 				executeCd(pipeline.commands[i]);
 				continue;
@@ -98,6 +99,7 @@ private:
 			int status;
 			waitpid(pid, &status, 0);
 		}
+		return true;
 	}
 	char** convertArgs(std::vector<std::string> vec) {
 		char** args = new char*[vec.size() + 1];
