@@ -18,6 +18,7 @@
 #include "lexer.h"
 #include "token.h"
 #include "shellerror.h"
+#include "pipeline.h"
 
 class Executor {
 public:
@@ -33,8 +34,7 @@ public:
 		}
 	}
 private:
-	//Do we just want to pass by reference instead?
-	void executePipeline(Pipeline pipeline) {
+	void executePipeline(const Pipeline& pipeline) {
 		for (const auto& cmd : pipeline.commands) {
 			executeCommand(cmd);
 		}
@@ -56,15 +56,39 @@ private:
 			args[i] = new char[vec[i].length() + 1];
 			strcpy(args[i], vec[i].c_str());
 		}
+		args[vec.size()] = nullptr;
 		return args;
 	}
 	void callCommand(const Command& cmd) {
+		int coutfd = -1;
+		int cinfd = -1;
+		int cerrfd = -1;
 		int status;
+
+		if (cmd.redirection.coutFile != "") {
+			coutfd = open(cmd.redirection.coutFile.c_str(), O_WRONLY | O_CREAT | (cmd.redirection.coutFileAppend ? O_APPEND : O_TRUNC), 0644);
+		}
+		if (cmd.redirection.cerrFile != "") {
+			cerrfd = open(cmd.redirection.cerrFile.c_str(), O_WRONLY | O_CREAT | (cmd.redirection.cerrFileAppend ? O_APPEND : O_TRUNC), 0644);
+		}
+		if (cmd.redirection.cinFile != "") {
+			cinfd = open(cmd.redirection.cinFile.c_str(), O_RDONLY);
+		}
+		
 		pid_t pid = fork();
 		char** args = convertArgs(cmd.args);
 		if (pid == 0) {
 			if (cmd.background) {
 				setsid();
+			}
+			if (coutfd != -1) {
+				dup2(coutfd, STDOUT_FILENO);
+			}
+			if (cerrfd != -1) {
+				dup2(cerrfd, STDERR_FILENO);
+			}
+			if (cinfd != -1) {
+				dup2(cinfd, STDIN_FILENO);
 			}
 			execvp(args[0], args);
 		} else {
@@ -74,7 +98,21 @@ private:
 			} else {
 				wait(&status);
 			}
+			if (coutfd != -1) {
+				close(coutfd);
+			}
+			if (cerrfd != -1) {
+				close(cerrfd);
+			}
+			if (cinfd != -1) {
+				close(cinfd);
+			}
+
 		}
+		for (size_t i = 0; i < cmd.args.size(); i++) {
+			delete[] args[i];
+		}
+		delete[] args;
 	}
 	void executeCd(const Command& cmd) {
 		if (cmd.args.size() == 1) {
